@@ -256,19 +256,18 @@ def create_embedding(
         openai.Embedding: The embedding object.
     """
     cfg = Config()
-    api_manager = ApiManager()
 
     # Prepare the text for chunking
-    max_context_length = api_manager.get_total_completion_tokens() - 1
+    max_context_length = 3000
     chunked_text = create_chunked_string(text, max_context_length)
     embeddings = []
 
     usage = None
-    prompt_tokens = 0;
+    prompt_tokens = 0
     for chunk in chunked_text:
         chunk_text = " ".join(chunk)
         response = openai.Embedding.create(input=chunk_text, api_key=cfg.openai_api_key, **kwargs)
-        embedding_for_chunk = np.array(response["data"][0]["embedding"])  # Convert to a NumPy array
+        embedding_for_chunk = np.array(response["data"][0]["embedding"])
         embeddings.append(embedding_for_chunk)
         prompt_tokens = prompt_tokens + response['usage']['prompt_tokens']
 
