@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 import openai
-import spacy
 
 from autogpt.config import Config
 from autogpt.logs import logger
 from autogpt.modelsinfo import COSTS
 from autogpt.singleton import Singleton
+from autogpt.utils import create_chunked_string
 
 
 class ApiManager(metaclass=Singleton):
@@ -83,23 +83,12 @@ class ApiManager(metaclass=Singleton):
         List[float]: The generated embedding as a list of float values.
         """
 
-        # Define the maximum context length and chunk size
+        cfg = Config()
+
+        # Prepare the text for embeddings by chunking it into smaller pieces
         max_context_length = self.get_total_completion_tokens()
-        spacy_max_length = spacy_max_length = 1_000_000
-
-        # This needs to be text, not a list
         text = " ".join(text_list)
-
-        # Tokenize the input text using spaCy and process it in chunks
-        nlp = spacy.load("en_core_web_sm")
-        tokens = []
-        for start in range(0, len(text), spacy_max_length):
-            chunk_text = text[start:start+spacy_max_length]
-            doc = nlp(chunk_text)
-            tokens.extend(token.text for token in doc)
-
-        # Split the tokens into smaller chunks
-        text_chunks = [tokens[i:i+max_context_length] for i in range(0, len(tokens), max_context_length)]
+        text_chunks = create_chunked_string(text, max_context_length)
         embeddings = []
 
         # Create embeddings and average together
@@ -121,7 +110,7 @@ class ApiManager(metaclass=Singleton):
             embedding_for_chunk = response["data"][0]["embedding"]
             embeddings.append(embedding_for_chunk)
 
-        combined_embedding = np.mean(embeddings, axis=0)
+        combined_embedding = np.vstack(embeddings)
 
         return combined_embedding.tolist()
 

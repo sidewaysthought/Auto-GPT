@@ -66,7 +66,6 @@ class LocalCache(MemoryProviderSingleton):
         embedding = get_ada_embedding(text)
 
         vector = np.array(embedding).astype(np.float32)
-        vector = vector[np.newaxis, :]
         self.data.embeddings = np.concatenate(
             [
                 self.data.embeddings,
@@ -113,11 +112,14 @@ class LocalCache(MemoryProviderSingleton):
         """
         embedding = get_ada_embedding(text)
 
-        scores = np.dot(self.data.embeddings, embedding)
+        scores = np.dot(self.data.embeddings, embedding.T)
 
-        top_k_indices = np.argsort(scores)[-k:][::-1]
+        top_k_indices = np.argsort(scores, axis=None)[-k:][::-1]
 
-        return [self.data.texts[i] for i in top_k_indices]
+        indices = np.unravel_index(top_k_indices, scores.shape)
+        valid_indices = [i[0] for i in indices if i[0] < len(self.data.texts)]
+
+        return [self.data.texts[i] for i in valid_indices]
 
     def get_stats(self) -> tuple[int, tuple[int, ...]]:
         """
