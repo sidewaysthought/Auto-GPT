@@ -1,6 +1,7 @@
 import os
 
 import requests
+import spacy
 import yaml
 from colorama import Fore
 from git.repo import Repo
@@ -129,3 +130,21 @@ def get_latest_bulletin() -> str:
         open("CURRENT_BULLETIN.md", "w", encoding="utf-8").write(new_bulletin)
         return f" {Fore.RED}::UPDATED:: {Fore.CYAN}{new_bulletin}{Fore.RESET}"
     return current_bulletin
+
+
+def create_chunked_string(text: str, max_length: int = 1000) -> list:
+    """Split a string into chunks of max_length."""
+
+    # Tokenize the input text using spaCy and process it in chunks
+    nlp = spacy.load("en_core_web_sm")
+    spacy_max_length = 1000000
+    tokens = []
+
+    for start in range(0, len(text), spacy_max_length):
+        chunk_text = text[start:start+spacy_max_length]
+        doc = nlp(chunk_text)
+        tokens.extend(token.text for token in doc)
+
+    text_chunks = [tokens[i:i+max_length] for i in range(0, len(tokens), max_length)]
+    
+    return text_chunks

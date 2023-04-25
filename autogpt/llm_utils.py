@@ -4,6 +4,7 @@ import functools
 import time
 from typing import List, Optional
 
+import numpy as np
 import openai
 from colorama import Fore, Style
 from openai.error import APIError, RateLimitError, Timeout
@@ -12,6 +13,7 @@ from autogpt.api_manager import ApiManager
 from autogpt.config import Config
 from autogpt.logs import logger
 from autogpt.types.openai import Message
+from autogpt.utils import create_chunked_string
 
 
 def retry_openai_api(
@@ -231,11 +233,11 @@ def get_ada_embedding(text: str) -> List[float]:
     embedding = create_embedding(text, **kwargs)
     api_manager = ApiManager()
     api_manager.update_cost(
-        prompt_tokens=embedding.usage.prompt_tokens,
+        prompt_tokens=embedding["prompt_tokens"],
         completion_tokens=0,
         model=model,
     )
-    return embedding["data"][0]["embedding"]
+    return embedding["data"]
 
 
 @retry_openai_api()
@@ -254,8 +256,25 @@ def create_embedding(
         openai.Embedding: The embedding object.
     """
     cfg = Config()
-    return openai.Embedding.create(
-        input=[text],
-        api_key=cfg.openai_api_key,
-        **kwargs,
-    )
+    api_manager = ApiManager()
+
+    # Prepare the text for chunking
+    max_context_length = api_manager.get_total_completion_tokens() - 1
+    chunked_text = create_chunked_string(text, max_context_length)
+    embeddings = []
+
+    usage = None
+    prompt_tokens = 0;
+    for chunk in chunked_text:
+        chunk_text = " ".join(chunk)
+        response = openai.Embedding.create(input=chunk_text, api_key=cfg.openai_api_key, **kwargs)
+        embedding_for_chunk = np.array(response["data"][0]["embedding"])  # Convert to a NumPy array
+        embeddings.append(embedding_for_chunk)
+        prompt_tokens = prompt_tokens + response['usage']['prompt_tokens']
+
+    result = {
+        "data": np.vstack(embeddings),
+        "prompt_tokens": prompt_tokens
+    }
+
+    return result
